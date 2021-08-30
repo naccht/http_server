@@ -1,0 +1,30 @@
+version: '3'
+
+services:
+
+  api:
+    container_name: api
+    restart: always
+    build: ./api
+    networks:
+        - internal_net
+    expose:
+        - "5000"
+    ports:
+        - "5000:5000"
+
+  nginx:
+    container_name: nginx
+    restart: always
+    build: ./nginx
+    networks:
+        - internal_net
+    expose:
+        - "80"
+    ports:
+        - "80:80"
+    depends_on:
+        - api
+
+networks:
+  internal_net:
