@@ -2,11 +2,15 @@ from aiohttp.client import ClientSession
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import asyncio
+from configparser import ConfigParser
 
 app = Flask(__name__)
 CORS(app)
 ROUTE = "/api"
-external_api = "https://exponea-engineering-assignment.appspot.com/api/work"
+config = ConfigParser()
+config.read('config.ini')
+external_api = config['DEFAULT']['api_add']
+requests_number = int(config['DEFAULT']['requests'])
 
 # Async function to fetch results from Exponea testing server, standard blocking
 # cannot be used, otherwise implementing "first" would be unenecessairly difficult.
@@ -24,13 +28,13 @@ async def get(session, url):
   
 
 @app.route(ROUTE+'/all', methods = ['GET'])
-async def list_all_notes():
+async def get_all():
     #timeout = request.get_json().get('timeout')
     async with ClientSession() as session:
       tasks = []
       # I know this part is not so necessary, but it allows you to modify the
       # number of calls to the Exponea api if needed
-      for x in range(2):
+      for x in range(requests_number):
         tasks.append(asyncio.create_task(get(session, external_api)))
       # I put a default timeout (10 sec) even if it wasn't explicitly asked since I just
       # couldn't let the server hang forever if there was a problem with the 
@@ -46,14 +50,14 @@ async def list_all_notes():
     # Check response tuple, if only one element means timeout reached. Added second
     # condition since it's possible (although extremely improbable) that one request
     # was successful before timeout
-    if len(responses) == 2 and len(responses[0]) == 2:
-      response1 = list(responses[0])[0].result()
-      response2 = list(responses[0])[1].result()
+    if len(responses) == requests_number and len(responses[0]) == requests_number:
+      response_list = []
+      for x in range(requests_number):
+        response_list.append(list(responses[0])[x].result())
       # Check if both responses are valid
-      if response1 and response2:
-        message = (response1, response2)
+      if not False in response_list:
         # Transform touple to json list before return
-        return(jsonify(message))
+        return(jsonify(response_list))
       else:
         return 'Internal server error 500', 500
     else:
@@ -61,11 +65,11 @@ async def list_all_notes():
 
 
 @app.route(ROUTE+'/first', methods = ['GET'])
-async def get_note():
+async def get_first():
     #timeout = request.get_json().get('timeout')
     async with ClientSession() as session:
       tasks = []
-      for x in range(2):
+      for x in range(requests_number):
         tasks.append(asyncio.create_task(get(session, external_api)))
 
       timeout = request.args.get('timeout') or 10000
